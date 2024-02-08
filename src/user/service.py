@@ -39,6 +39,10 @@ class UserService:
         return not (friendship is None)
     
     async def send_friend_request(self, sender_id, receiver_id) -> FriendRequest:
+        are_friends = await self.are_friends(sender_id, receiver_id)
+        if are_friends:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="these users are already friends")
         req = await self._friend_req_rep.get_by_id(sender_id, receiver_id)
         if req:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
