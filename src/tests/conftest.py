@@ -10,21 +10,32 @@ from sqlalchemy.pool import NullPool
 from db.init_db import Base, get_db
 from src.main import app
 from auth.schemas import Token
+from user.schemas import UserInDb
+from user.models import User
+from user.repo import UserRep
+from core.security import get_password_hash
 
 # DATABASE
 DATABASE_URL_TEST = "sqlite+aiosqlite:///test.db"
 
-BASE_URL = "http://test"
 
 engine_test = create_async_engine(DATABASE_URL_TEST, poolclass=NullPool)
 async_session_maker = sessionmaker(engine_test, class_=AsyncSession, expire_on_commit=False)
 Base.metadata.engine = engine_test
 
+BASE_URL = "http://test"
+
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+
+app.dependency_overrides[get_db] = get_async_session
+
+@pytest.fixture()
 async def async_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
 
-app.dependency_overrides[get_db] = async_session
 
 
 @pytest.fixture(autouse=True, scope='function')
@@ -34,6 +45,18 @@ async def prepare_database():
     yield
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+# SETUP
+@pytest.fixture(scope='session')
+def event_loop(request):
+    """Create an instance of the default event loop for each test case."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+client = TestClient(app)
+
 
 @pytest.fixture(scope="function")
 async def logged_in_client() -> AsyncGenerator[AsyncClient, None]:
@@ -62,15 +85,6 @@ async def logged_in_client() -> AsyncGenerator[AsyncClient, None]:
                            headers=headers) as new_user_conn:
         yield new_user_conn
 
-# SETUP
-@pytest.fixture(scope='session')
-def event_loop(request):
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-client = TestClient(app)
 
 @pytest.fixture(scope="session")
 async def ac() -> AsyncGenerator[AsyncClient, None]:
