@@ -1,9 +1,17 @@
-from sqlalchemy import Boolean, Column, Integer, String
+from sqlalchemy import Boolean, Column, ForeignKey, ForeignKeyConstraint, Integer, String, Table
 from db.init_db import Base
 from sqlalchemy.ext.asyncio import AsyncAttrs
-from sqlalchemy.orm import Mapped, mapped_column
-from typing import Optional
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional, Set
 import uuid
+
+
+friends_table = Table(
+    "friends",
+    Base.metadata,
+    Column("user_left_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_right_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+)
 
 class User(Base):
 
@@ -14,3 +22,16 @@ class User(Base):
     hashed_password: Mapped[str]
     first_name: Mapped[str]
     last_name: Mapped[str]
+    friends: Mapped[Set["User"]] = relationship(secondary=friends_table, 
+                                                primaryjoin = (friends_table.c.user_left_id == id),
+                                                secondaryjoin = (friends_table.c.user_right_id == id),
+                                                lazy='selectin')
+
+class FriendRequest(Base):
+
+    __tablename__ = "friend_request"
+
+    sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    receiver_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+    sender: Mapped[User] = relationship(backref="sended_requests", foreign_keys=[sender_id])
+    receiver: Mapped[User] = relationship(backref="received_requests", foreign_keys=[receiver_id])
