@@ -1,4 +1,5 @@
 from uuid import UUID
+import uuid
 from pydantic import BaseModel, EmailStr
 
 class BaseUser(BaseModel):
@@ -18,3 +19,8 @@ class UserInDb(BaseUser):
 
 class UserOut(BaseUser):
     id: UUID
+
+class FriendRequestSchema(BaseModel):
+
+    receiver_id: uuid.UUID
+    sender_id: uuid.UUID
